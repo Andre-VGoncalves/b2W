@@ -87,7 +87,7 @@ class MapsActivity : AppCompatActivity() {
             ) {
                 loadLastLocation()
             } else {
-                showError("é necessaria a permissão")
+                showError(getString(R.string.permission_request))
                 finish()
             }
         }
@@ -121,9 +121,9 @@ class MapsActivity : AppCompatActivity() {
     private fun handleLocationError() {
         if (!isGpsDialogOpened) {
             isGpsDialogOpened = true
-            showError("GPS Desativado")
+            showError(getString(R.string.gps_not_enable))
         } else {
-            showError("Localização Indisponivel")
+            showError(getString(R.string.loc_not_found))
         }
 
 
@@ -175,13 +175,11 @@ class MapsActivity : AppCompatActivity() {
 
     private fun searchAddress() {
         val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-             imm.hideSoftInputFromWindow(edtSearch.windowToken, 0)
-               viewModel.searchAddress(edtSearch.text.toString())
+        imm.hideSoftInputFromWindow(edtSearch.windowToken, 0)
+        viewModel.searchAddress(edtSearch.text.toString())
     }
 
-
-
     private fun showAddressListDialog(addresses: List<Address>) {
-           AddressListFragment.newInstance(addresses).show(supportFragmentManager, null)
+        AddressListFragment.newInstance(addresses).show(supportFragmentManager, null)
     }
 }

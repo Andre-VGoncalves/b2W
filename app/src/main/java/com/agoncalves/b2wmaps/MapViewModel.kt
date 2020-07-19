@@ -10,12 +10,11 @@ import android.os.Bundle
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.ViewModel
 import com.agoncalves.b2wmaps.model.GeoLocResponse
 import com.agoncalves.b2wmaps.model.GoogleApiConnectionStatus
+import com.agoncalves.b2wmaps.model.MapLoc
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.GoogleApiClient
-import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.*
 import com.google.android.gms.maps.model.LatLng
 import kotlinx.coroutines.*
@@ -26,10 +25,7 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 
-class MapViewModel(app: Application) : AndroidViewModel(app), CoroutineScope {
-    private val job = Job()
-    override val coroutineContext: CoroutineContext
-        get() = Dispatchers.Main + job
+class MapViewModel(app: Application) : BaseViewModel(app) {
 
     val viewState = MutableLiveData<MapsViewState>()
 
@@ -37,28 +33,13 @@ class MapViewModel(app: Application) : AndroidViewModel(app), CoroutineScope {
     private val locationClient: FusedLocationProviderClient by lazy {
         LocationServices.getFusedLocationProviderClient(getContext())
     }
-    private val geoLoc: GeoLoc by lazy { GeoLoc(getContext()) }
 
-    private val addresses = MutableLiveData<List<Address>?>()
-    private val loading = MutableLiveData<Boolean>()
-    private val loadingRoute = MutableLiveData<Boolean>()
-    private val currentLocation = MutableLiveData<LatLng>()
-
-    private val mapState = MutableLiveData<MapState>().apply {
-        value = MapState()
+    private val mapState = MutableLiveData<MapLoc>().apply {
+        value = MapLoc()
     }
 
-    override fun onCleared() {
-        super.onCleared()
-        job.cancel()
-    }
-
-    fun getMapState(): LiveData<MapState> {
+    fun getMapState(): LiveData<MapLoc> {
         return mapState
-    }
-
-    fun getCurrentLocation(): LiveData<LatLng> {
-        return currentLocation
     }
 
     fun connectGoogleApiClient() {
@@ -103,7 +84,8 @@ class MapViewModel(app: Application) : AndroidViewModel(app), CoroutineScope {
                 .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
                 .setInterval(5 * 1000)
                 .setFastestInterval(1 * 1000)
-            locationClient.requestLocationUpdates(locationRequest,
+            locationClient.requestLocationUpdates(
+                locationRequest,
                 object : LocationCallback() {
                     override fun onLocationResult(result: LocationResult?) {
                         super.onLocationResult(result)
@@ -120,11 +102,11 @@ class MapViewModel(app: Application) : AndroidViewModel(app), CoroutineScope {
         }
         locationClient.lastLocation
             .addOnSuccessListener { location ->
-                if (location == null) {
-                    waitForLocation()
-                } else {
+                location?.let {
                     updateOriginByLocation(location)
-                }
+
+                } ?: waitForLocation()
+
             }
             .addOnFailureListener {
                 waitForLocation()
@@ -161,42 +143,28 @@ class MapViewModel(app: Application) : AndroidViewModel(app), CoroutineScope {
                 val success = withTimeout(2000) { loadLastLocation() }
                 if (success) {
                     startLocationUpdates()
-                    null
                 } else {
-                    viewState.value = MapsViewState.ShowError (true)
+                    viewState.value = MapsViewState.ShowError(true)
                 }
             } catch (timeout: TimeoutCancellationException) {
-                viewState.value = MapsViewState.ShowError (true)
+                viewState.value = MapsViewState.ShowError(true)
             } catch (exception: ApiException) {
-                when (exception.statusCode) {
-                    LocationSettingsStatusCodes.RESOLUTION_REQUIRED ->
-                        viewState.value = MapsViewState.ShowError (true)
-                    LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE ->
-                        viewState.value = MapsViewState.ShowError (true)
-                    else ->
-                        viewState.value = MapsViewState.ShowError (true)
-                }
+                viewState.value = MapsViewState.ShowError(true)
+
             }
         }
     }
 
     fun searchAddress(s: String) {
         launch {
-            loading.value = true
             val geoCoder = Geocoder(getContext(), Locale.getDefault())
             viewState.value = MapsViewState.ShowAddres(withContext(Dispatchers.IO) {
                 geoCoder.getFromLocationName(s, 10)
             } as ArrayList<Address>)
-            loading.value = false
         }
     }
 
-    fun clearSearchAddressResult() {
-        addresses.value = null
-    }
-
     fun setDestination(latLng: LatLng) {
-        addresses.value = null
         mapState.value = mapState.value?.copy(destination = latLng)
         loadRoute()
     }
@@ -207,12 +175,10 @@ class MapViewModel(app: Application) : AndroidViewModel(app), CoroutineScope {
             val dest = mapState.value?.destination
             if (orig != null && dest != null) {
                 launch {
-                    loadingRoute.value = true
                     val route = withContext(Dispatchers.IO) {
                         RouteHttp.searchRoute(orig, dest)
                     }
                     mapState.value = mapState.value?.copy(route = route)
-                    loadingRoute.value = false
                 }
             }
         }
@@ -221,8 +187,8 @@ class MapViewModel(app: Application) : AndroidViewModel(app), CoroutineScope {
     private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(locationResult: LocationResult?) {
             val location = locationResult?.lastLocation
-            if (location != null) {
-                currentLocation.value = LatLng(location.latitude, location.longitude)
+            viewState.value = location?.latitude?.let { LatLng(it, location.longitude) }?.let {
+                MapsViewState.CurrentLocation(it)
             }
         }
     }
@@ -241,38 +207,6 @@ class MapViewModel(app: Application) : AndroidViewModel(app), CoroutineScope {
             .removeLocationUpdates(locationCallback)
     }
 
-    @SuppressLint("MissingPermission")
-    fun setGeofence(pit: PendingIntent, latLng: LatLng) {
-        if (googleApiClient?.isConnected == true) {
-            val geofenceInfo = GeoLocResponse(
-                "1",
-                latLng.latitude, latLng.longitude,
-                500f, // em metros
-                Geofence.NEVER_EXPIRE,
-                Geofence.GEOFENCE_TRANSITION_ENTER or Geofence.GEOFENCE_TRANSITION_EXIT
-            )
-            val request = GeofencingRequest.Builder()
-                .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER)
-                .addGeofences(listOf(geofenceInfo.getGeofence()))
-                .build()
-            LocationServices.getGeofencingClient(getContext())
-                .addGeofences(request, pit)
-                .addOnCompleteListener {
-                    if (it.isSuccessful) {
-                        geoLoc.saveGeofence(geofenceInfo)
-                        mapState.value = mapState.value?.copy(geoLocResponse = geofenceInfo)
-                    }
-                }
-        }
-    }
-
     private fun getContext() = getApplication<Application>()
 
-    // Data classes -----------
-    data class MapState(
-        val origin: LatLng? = null,
-        val destination: LatLng? = null,
-        val route: List<LatLng>? = null,
-        val geoLocResponse: GeoLocResponse? = null
-    )
 }

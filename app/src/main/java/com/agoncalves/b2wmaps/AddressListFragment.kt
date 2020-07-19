@@ -24,9 +24,9 @@ class AddressListFragment : DialogFragment() {
                     selectedAddress.longitude))
             }
         return AlertDialog.Builder(requireContext())
-            .setTitle("R.string.map_title_address_result_dialog")
+            .setTitle("Escolha o endereço")
             .setItems(addressesToArray(addresses), onAddressClick)
-            .setOnDismissListener { viewModel.clearSearchAddressResult() }
+            .setOnDismissListener {  }
             .create()
     }
     companion object {

@@ -1,10 +1,9 @@
 package com.agoncalves.b2wmaps
 
-import android.app.PendingIntent
-import android.content.Intent
 import android.graphics.Color
 import androidx.lifecycle.Observer
-import androidx.lifecycle.ViewModelProviders
+import androidx.lifecycle.ViewModelProvider
+import com.agoncalves.b2wmaps.model.MapLoc
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
@@ -14,7 +13,7 @@ import com.google.android.gms.maps.model.*
 class MapFragment : SupportMapFragment() {
 
     private val viewModel: MapViewModel by lazy {
-        ViewModelProviders.of(requireActivity()).get(MapViewModel::class.java)
+        ViewModelProvider(requireActivity()).get(MapViewModel::class.java)
     }
     private var googleMap: GoogleMap? = null
     private lateinit var markerCurrentLocation: Marker
@@ -23,9 +22,11 @@ class MapFragment : SupportMapFragment() {
         super.getMapAsync {
             googleMap = it
             setupMap()
+            setObservers()
             callback?.onMapReady(googleMap)
         }
     }
+
     private fun setupMap() {
         googleMap?.run {
             mapType = GoogleMap.MAP_TYPE_NORMAL
@@ -35,8 +36,16 @@ class MapFragment : SupportMapFragment() {
                 onMapLongClick(latLng)
             }
         }
+    }
 
-
+    private fun setObservers() {
+        viewModel.viewState.observe(viewLifecycleOwner, Observer {
+            when (it) {
+                is MapsViewState.CurrentLocation -> if (this::markerCurrentLocation.isInitialized) {
+                    markerCurrentLocation.position = it.latLang
+                }
+            }
+        })
 
         viewModel.getMapState()
             .observe(this, Observer { mapState ->
@@ -44,34 +53,33 @@ class MapFragment : SupportMapFragment() {
                     updateMap(mapState)
                 }
             })
-        viewModel.getCurrentLocation()
-            .observe(this, Observer { currentLocation ->
-                if (currentLocation != null && this::markerCurrentLocation.isInitialized) {
-                    markerCurrentLocation?.position = currentLocation
-                }
-            })
     }
-    private fun updateMap(mapState: MapViewModel.MapState) {
+
+    private fun updateMap(mapState: MapLoc) {
         googleMap?.run {
             clear()
             val area = LatLngBounds.Builder()
-            val origin = mapState.origin
-            if (origin != null) {
-                addMarker(MarkerOptions()
-                    .position(origin)
-                    .title(getString(R.string.map_marker_origin)))
-                area.include(origin)
-            }
-            val destination = mapState.destination
-            if (destination != null) {
-                addMarker(MarkerOptions()
-                    .position(destination)
-                    .title(getString(R.string.map_marker_destination))
+            mapState.origin?.let {
+                addMarker(
+                    MarkerOptions()
+                        .position(it)
+                        .title(getString(R.string.map_marker_origin))
                 )
-                area.include(destination)
+                area.include(it)
             }
+
+            mapState.destination?.let {
+                addMarker(
+                    MarkerOptions()
+                        .position(it)
+                        .title(getString(R.string.map_marker_destination))
+                )
+                area.include(it)
+            }
+
+
             val route = mapState.route
-            if (route != null && route.isNotEmpty()) {
+            if (!route.isNullOrEmpty()) {
                 val polylineOptions = PolylineOptions()
                     .addAll(route)
                     .width(5f)
@@ -80,30 +88,27 @@ class MapFragment : SupportMapFragment() {
                 addPolyline(polylineOptions)
                 route.forEach { area.include(it) }
             }
-            if (origin != null) {
-                if (destination != null) {
+            if (mapState.origin != null) {
+                if (mapState.destination != null) {
                     animateCamera(CameraUpdateFactory.newLatLngBounds(area.build(), 50))
                 } else {
-                    animateCamera(CameraUpdateFactory.newLatLngZoom(origin, 17f))
+                    animateCamera(CameraUpdateFactory.newLatLngZoom(mapState.origin, 17f))
                 }
             }
-            val geofenceInfo = mapState.geoLocResponse
-            if (geofenceInfo != null) {
-                val latLng = LatLng(geofenceInfo.latitude, geofenceInfo.longitude)
-                addCircle(CircleOptions()
-                    .strokeWidth(2f)
-                    .fillColor(0x990000FF.toInt())
-                    .center(latLng)
-                    .radius(geofenceInfo.radius.toDouble())
+            mapState.geoLocResponse?.let {
+                val latLng = LatLng(it.latitude, it.longitude)
+                addCircle(
+                    CircleOptions()
+                        .strokeWidth(2f)
+                        .fillColor(0x990000FF.toInt())
+                        .center(latLng)
+                        .radius(it.radius.toDouble())
                 )
             }
         }
     }
 
     private fun onMapLongClick(latLng: LatLng) {
-        val pit = PendingIntent.getBroadcast(requireContext(), 0,
-            Intent(requireContext(), GeoLoc::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT)
-        viewModel.setGeofence(pit, latLng)
+        viewModel.setDestination(latLng)
     }
 }

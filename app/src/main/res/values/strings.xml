@@ -5,4 +5,7 @@
     <string name="map_msg_search_route">Traçando rota…</string>
     <string name="map_marker_origin">Origem</string>
     <string name="map_marker_destination">Destino</string>
+    <string name="gps_not_enable">GPS Desativado</string>
+    <string name="loc_not_found">Localização Indisponivel</string>
+    <string name="permission_request">é necessaria a permissão</string>
 </resources>
