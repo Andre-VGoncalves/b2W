@@ -10,3 +10,7 @@
 
 Principal desafio que encontrei foi ativar as chaves no google, varias vezes deu erro ao ativar, ficava carregando eternamente ou criava a chave mas ela não funcionava, infelizmente para conseguir fazer funcionar tive que reptir esse processo por algum tempo, porém isso resultou em não conseguir ativar o placeHolder para fazer o auto complete.
 Fazia um bom tempo que eu não implementava coisas no maps e tive a oportunidade de conhecer as mudanças que a google fez nesse tempo.
+
+
+
+### Observação subir com as chaves, irei desativar elas no dia 25/07/2020
