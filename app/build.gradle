@@ -45,6 +45,7 @@ dependencies {
     implementation "com.google.android.gms:play-services-maps:$map_version"
     implementation "com.google.android.gms:play-services-location:$playservices_version"
 
+
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutines_version"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:$coroutines_version"
 

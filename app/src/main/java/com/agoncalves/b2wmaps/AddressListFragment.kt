@@ -6,12 +6,13 @@ import android.location.Address
 import android.os.Bundle
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.DialogFragment
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProviders
 import com.google.android.gms.maps.model.LatLng
 
 class AddressListFragment : DialogFragment() {
     private val viewModel: MapViewModel by lazy {
-        ViewModelProviders.of(requireActivity()).get(MapViewModel::class.java)
+        ViewModelProvider(requireActivity()).get(MapViewModel::class.java)
     }
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val args = arguments?.getParcelableArray(EXTRA_ADDRESSES) ?: emptyArray()
