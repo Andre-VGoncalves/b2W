@@ -1,4 +1,8 @@
 <resources>
     <string name="app_name">B2W Maps</string>
     <string name="title_activity_maps">Map</string>
+    <string name="map_msg_search_address">Buscando endereço…</string>
+    <string name="map_msg_search_route">Traçando rota…</string>
+    <string name="map_marker_origin">Origem</string>
+    <string name="map_marker_destination">Destino</string>
 </resources>
